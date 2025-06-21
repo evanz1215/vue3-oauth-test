@@ -1,6 +1,23 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useLine } from '@/composables/useLine'
+
+// 定義 emits
+const emit = defineEmits<{
+  statusChange: [
+    status: {
+      isLoggedIn: boolean
+      currentUser: {
+        userId: string
+        displayName: string
+        pictureUrl?: string
+        statusMessage?: string
+      } | null
+      isLoading: boolean
+      error: string | null
+    },
+  ]
+}>()
 
 // LINE OAuth 配置
 const lineConfig = {
@@ -12,6 +29,31 @@ const lineConfig = {
 // 使用 LINE OAuth
 const { isLoading, isLoggedIn, currentUser, error, signIn, signOut, checkAuthStatus } =
   useLine(lineConfig)
+
+// 暴露狀態給父組件
+defineExpose({
+  isLoggedIn,
+  currentUser,
+  isLoading,
+  error,
+  signIn,
+  signOut,
+  checkAuthStatus,
+})
+
+// 監聽狀態變化並向父組件發送
+watch(
+  [isLoggedIn, currentUser, isLoading, error],
+  () => {
+    emit('statusChange', {
+      isLoggedIn: isLoggedIn.value,
+      currentUser: currentUser.value,
+      isLoading: isLoading.value,
+      error: error.value,
+    })
+  },
+  { immediate: true },
+)
 
 // 組件掛載時檢查認證狀態
 onMounted(() => {

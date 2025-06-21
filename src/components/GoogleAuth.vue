@@ -40,8 +40,25 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useGoogle } from '@/composables/useGoogle'
+
+// 定義 emits
+const emit = defineEmits<{
+  statusChange: [
+    status: {
+      isLoggedIn: boolean
+      currentUser: {
+        id: string
+        name: string
+        email: string
+        picture?: string
+      } | null
+      isLoading: boolean
+      error: string | null
+    },
+  ]
+}>()
 
 // Google OAuth 配置
 const googleConfig = {
@@ -55,6 +72,31 @@ const googleConfig = {
 // 初始化 Google OAuth
 const { isLoggedIn, currentUser, isLoading, error, signIn, signOut, checkAuthStatus } =
   useGoogle(googleConfig)
+
+// 暴露狀態給父組件
+defineExpose({
+  isLoggedIn,
+  currentUser,
+  isLoading,
+  error,
+  signIn,
+  signOut,
+  checkAuthStatus,
+})
+
+// 監聽狀態變化並向父組件發送
+watch(
+  [isLoggedIn, currentUser, isLoading, error],
+  () => {
+    emit('statusChange', {
+      isLoggedIn: isLoggedIn.value,
+      currentUser: currentUser.value,
+      isLoading: isLoading.value,
+      error: error.value,
+    })
+  },
+  { immediate: true },
+)
 
 // 調試資訊
 const debugInfo = {

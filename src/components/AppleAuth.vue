@@ -48,8 +48,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useApple } from '@/composables/useApple'
+
+// 定義 emits
+const emit = defineEmits<{
+  statusChange: [
+    status: {
+      isLoggedIn: boolean
+      currentUser: {
+        id: string
+        name?: {
+          firstName: string
+          lastName: string
+        }
+        email?: string
+      } | null
+      isLoading: boolean
+      error: string | null
+    },
+  ]
+}>()
 
 const showDebug = ref(false)
 
@@ -63,6 +82,31 @@ const appleConfig = {
 
 const { isLoggedIn, currentUser, isLoading, error, signIn, signOut, checkAuthStatus } =
   useApple(appleConfig)
+
+// 暴露狀態給父組件
+defineExpose({
+  isLoggedIn,
+  currentUser,
+  isLoading,
+  error,
+  signIn,
+  signOut,
+  checkAuthStatus,
+})
+
+// 監聽狀態變化並向父組件發送
+watch(
+  [isLoggedIn, currentUser, isLoading, error],
+  () => {
+    emit('statusChange', {
+      isLoggedIn: isLoggedIn.value,
+      currentUser: currentUser.value,
+      isLoading: isLoading.value,
+      error: error.value,
+    })
+  },
+  { immediate: true },
+)
 
 const handleSignIn = async () => {
   try {

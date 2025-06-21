@@ -1,8 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useGoogle } from '@/composables/useGoogle'
-import { useApple } from '@/composables/useApple'
-import { useLine } from '@/composables/useLine'
 import GoogleAuth from '@/components/GoogleAuth.vue'
 import AppleAuth from '@/components/AppleAuth.vue'
 import LineAuth from '@/components/LineAuth.vue'
@@ -10,39 +7,79 @@ import LineAuth from '@/components/LineAuth.vue'
 const isLoaded = ref(false)
 const activeTab = ref('demo')
 
-// Google OAuth 配置
-const googleConfig = {
-  clientId:
-    import.meta.env.VITE_GOOGLE_CLIENT_ID || 'your-google-client-id.apps.googleusercontent.com',
-  redirectUri: window.location.origin,
+// OAuth 狀態管理
+const googleStatus = ref<{
+  isLoggedIn: boolean
+  currentUser: {
+    id: string
+    name: string
+    email: string
+    picture?: string
+  } | null
+  isLoading: boolean
+  error: string | null
+}>({
+  isLoggedIn: false,
+  currentUser: null,
+  isLoading: false,
+  error: null,
+})
+
+const appleStatus = ref<{
+  isLoggedIn: boolean
+  currentUser: {
+    id: string
+    name?: {
+      firstName: string
+      lastName: string
+    }
+    email?: string
+  } | null
+  isLoading: boolean
+  error: string | null
+}>({
+  isLoggedIn: false,
+  currentUser: null,
+  isLoading: false,
+  error: null,
+})
+
+const lineStatus = ref<{
+  isLoggedIn: boolean
+  currentUser: {
+    userId: string
+    displayName: string
+    pictureUrl?: string
+    statusMessage?: string
+  } | null
+  isLoading: boolean
+  error: string | null
+}>({
+  isLoggedIn: false,
+  currentUser: null,
+  isLoading: false,
+  error: null,
+})
+
+// 處理各組件狀態變化
+const handleGoogleStatusChange = (status: typeof googleStatus.value) => {
+  googleStatus.value = status
 }
 
-// Apple OAuth 配置
-const appleConfig = {
-  clientId: import.meta.env.VITE_APPLE_CLIENT_ID || 'your-apple-client-id',
-  redirectUri: window.location.origin,
+const handleAppleStatusChange = (status: typeof appleStatus.value) => {
+  appleStatus.value = status
 }
 
-// LINE OAuth 配置
-const lineConfig = {
-  clientId: import.meta.env.VITE_LINE_CLIENT_ID || 'your-line-client-id',
-  redirectUri: `http://localhost:5173/auth/line/callback`,
-  scope: 'profile openid',
+const handleLineStatusChange = (status: typeof lineStatus.value) => {
+  lineStatus.value = status
 }
-
-console.log('Line Config:', lineConfig)
-
-// 使用 OAuth 組合式函數
-const googleAuth = useGoogle(googleConfig)
-const appleAuth = useApple(appleConfig)
-const lineAuth = useLine(lineConfig)
 
 // 計算總體登入狀態
 const totalConnected = computed(() => {
   let count = 0
-  if (googleAuth.isLoggedIn.value) count++
-  if (appleAuth.isLoggedIn.value) count++
-  if (lineAuth.isLoggedIn.value) count++
+  if (googleStatus.value.isLoggedIn) count++
+  if (appleStatus.value.isLoggedIn) count++
+  if (lineStatus.value.isLoggedIn) count++
   return count
 })
 
@@ -99,7 +136,7 @@ onMounted(() => {
           解決方案
         </h1>
         <p class="hero-subtitle">
-          基於 Vue 3 + TypeScript 的完整 OAuth 整合示範，支援 Google 和 Apple 登入
+          基於 Vue 3 + TypeScript 的完整 OAuth 整合示範，支援 Google 、 Apple 、 Line 登入
         </p>
         <div class="hero-stats">
           <div class="stat-item">
@@ -190,12 +227,12 @@ onMounted(() => {
                   <p>Google Identity Services</p>
                 </div>
               </div>
-              <div class="status-indicator" :class="{ active: googleAuth.isLoggedIn.value }">
+              <div class="status-indicator" :class="{ active: googleStatus.isLoggedIn }">
                 <div class="status-dot"></div>
               </div>
             </div>
             <div class="card-content">
-              <GoogleAuth />
+              <GoogleAuth @status-change="handleGoogleStatusChange" />
             </div>
           </div>
 
@@ -215,12 +252,12 @@ onMounted(() => {
                   <p>Apple ID Services</p>
                 </div>
               </div>
-              <div class="status-indicator" :class="{ active: appleAuth.isLoggedIn.value }">
+              <div class="status-indicator" :class="{ active: appleStatus.isLoggedIn }">
                 <div class="status-dot"></div>
               </div>
             </div>
             <div class="card-content">
-              <AppleAuth />
+              <AppleAuth @status-change="handleAppleStatusChange" />
             </div>
           </div>
 
@@ -240,12 +277,12 @@ onMounted(() => {
                   <p>LINE Login Services</p>
                 </div>
               </div>
-              <div class="status-indicator" :class="{ active: lineAuth.isLoggedIn.value }">
+              <div class="status-indicator" :class="{ active: lineStatus.isLoggedIn }">
                 <div class="status-dot"></div>
               </div>
             </div>
             <div class="card-content">
-              <LineAuth />
+              <LineAuth @status-change="handleLineStatusChange" />
             </div>
           </div>
         </div>
@@ -261,7 +298,7 @@ onMounted(() => {
 
           <div class="status-grid">
             <!-- Google 狀態 -->
-            <div class="status-card" :class="{ authenticated: googleAuth.isLoggedIn.value }">
+            <div class="status-card" :class="{ authenticated: googleStatus.isLoggedIn }">
               <div class="status-card-header">
                 <div class="status-icon google">
                   <svg viewBox="0 0 24 24">
@@ -284,40 +321,40 @@ onMounted(() => {
                   </svg>
                 </div>
                 <h3>Google</h3>
-                <div class="status-badge" :class="{ online: googleAuth.isLoggedIn.value }">
-                  {{ googleAuth.isLoggedIn.value ? '已連接' : '未連接' }}
+                <div class="status-badge" :class="{ online: googleStatus.isLoggedIn }">
+                  {{ googleStatus.isLoggedIn ? '已連接' : '未連接' }}
                 </div>
               </div>
               <div class="status-details">
-                <div class="detail-item" v-if="googleAuth.currentUser.value">
+                <div class="detail-item" v-if="googleStatus.currentUser">
                   <span class="detail-label">用戶名稱</span>
-                  <span class="detail-value">{{ googleAuth.currentUser.value.name }}</span>
+                  <span class="detail-value">{{ googleStatus.currentUser.name }}</span>
                 </div>
-                <div class="detail-item" v-if="googleAuth.currentUser.value">
+                <div class="detail-item" v-if="googleStatus.currentUser">
                   <span class="detail-label">電子郵件</span>
-                  <span class="detail-value">{{ googleAuth.currentUser.value.email }}</span>
+                  <span class="detail-value">{{ googleStatus.currentUser.email }}</span>
                 </div>
-                <div class="detail-item" v-if="googleAuth.currentUser.value">
+                <div class="detail-item" v-if="googleStatus.currentUser">
                   <span class="detail-label">用戶ID</span>
                   <span class="detail-value"
-                    >{{ googleAuth.currentUser.value.id.slice(0, 12) }}...</span
+                    >{{ googleStatus.currentUser.id.slice(0, 12) }}...</span
                   >
                 </div>
                 <div class="detail-item">
                   <span class="detail-label">載入狀態</span>
-                  <span class="detail-value" :class="{ loading: googleAuth.isLoading.value }">
-                    {{ googleAuth.isLoading.value ? '載入中...' : '就緒' }}
+                  <span class="detail-value" :class="{ loading: googleStatus.isLoading }">
+                    {{ googleStatus.isLoading ? '載入中...' : '就緒' }}
                   </span>
                 </div>
-                <div class="detail-item" v-if="googleAuth.error.value">
+                <div class="detail-item" v-if="googleStatus.error">
                   <span class="detail-label">錯誤</span>
-                  <span class="detail-value error">{{ googleAuth.error.value }}</span>
+                  <span class="detail-value error">{{ googleStatus.error }}</span>
                 </div>
               </div>
             </div>
 
             <!-- Apple 狀態 -->
-            <div class="status-card" :class="{ authenticated: appleAuth.isLoggedIn.value }">
+            <div class="status-card" :class="{ authenticated: appleStatus.isLoggedIn }">
               <div class="status-card-header">
                 <div class="status-icon apple">
                   <svg viewBox="0 0 24 24" fill="currentColor">
@@ -327,43 +364,41 @@ onMounted(() => {
                   </svg>
                 </div>
                 <h3>Apple</h3>
-                <div class="status-badge" :class="{ online: appleAuth.isLoggedIn.value }">
-                  {{ appleAuth.isLoggedIn.value ? '已連接' : '未連接' }}
+                <div class="status-badge" :class="{ online: appleStatus.isLoggedIn }">
+                  {{ appleStatus.isLoggedIn ? '已連接' : '未連接' }}
                 </div>
               </div>
               <div class="status-details">
-                <div class="detail-item" v-if="appleAuth.currentUser.value?.name">
+                <div class="detail-item" v-if="appleStatus.currentUser?.name">
                   <span class="detail-label">用戶名稱</span>
                   <span class="detail-value"
-                    >{{ appleAuth.currentUser.value.name.firstName }}
-                    {{ appleAuth.currentUser.value.name.lastName }}</span
+                    >{{ appleStatus.currentUser.name.firstName }}
+                    {{ appleStatus.currentUser.name.lastName }}</span
                   >
                 </div>
-                <div class="detail-item" v-if="appleAuth.currentUser.value?.email">
+                <div class="detail-item" v-if="appleStatus.currentUser?.email">
                   <span class="detail-label">電子郵件</span>
-                  <span class="detail-value">{{ appleAuth.currentUser.value.email }}</span>
+                  <span class="detail-value">{{ appleStatus.currentUser.email }}</span>
                 </div>
-                <div class="detail-item" v-if="appleAuth.currentUser.value">
+                <div class="detail-item" v-if="appleStatus.currentUser">
                   <span class="detail-label">用戶ID</span>
-                  <span class="detail-value"
-                    >{{ appleAuth.currentUser.value.id.slice(0, 12) }}...</span
-                  >
+                  <span class="detail-value">{{ appleStatus.currentUser.id.slice(0, 12) }}...</span>
                 </div>
                 <div class="detail-item">
                   <span class="detail-label">載入狀態</span>
-                  <span class="detail-value" :class="{ loading: appleAuth.isLoading.value }">
-                    {{ appleAuth.isLoading.value ? '載入中...' : '就緒' }}
+                  <span class="detail-value" :class="{ loading: appleStatus.isLoading }">
+                    {{ appleStatus.isLoading ? '載入中...' : '就緒' }}
                   </span>
                 </div>
-                <div class="detail-item" v-if="appleAuth.error.value">
+                <div class="detail-item" v-if="appleStatus.error">
                   <span class="detail-label">錯誤</span>
-                  <span class="detail-value error">{{ appleAuth.error.value }}</span>
+                  <span class="detail-value error">{{ appleStatus.error }}</span>
                 </div>
               </div>
             </div>
 
             <!-- LINE 狀態 -->
-            <div class="status-card" :class="{ authenticated: lineAuth.isLoggedIn.value }">
+            <div class="status-card" :class="{ authenticated: lineStatus.isLoggedIn }">
               <div class="status-card-header">
                 <div class="status-icon line">
                   <svg viewBox="0 0 24 24" fill="currentColor">
@@ -373,34 +408,34 @@ onMounted(() => {
                   </svg>
                 </div>
                 <h3>LINE</h3>
-                <div class="status-badge" :class="{ online: lineAuth.isLoggedIn.value }">
-                  {{ lineAuth.isLoggedIn.value ? '已連接' : '未連接' }}
+                <div class="status-badge" :class="{ online: lineStatus.isLoggedIn }">
+                  {{ lineStatus.isLoggedIn ? '已連接' : '未連接' }}
                 </div>
               </div>
               <div class="status-details">
-                <div class="detail-item" v-if="lineAuth.currentUser.value">
+                <div class="detail-item" v-if="lineStatus.currentUser">
                   <span class="detail-label">用戶名稱</span>
-                  <span class="detail-value">{{ lineAuth.currentUser.value.displayName }}</span>
+                  <span class="detail-value">{{ lineStatus.currentUser.displayName }}</span>
                 </div>
-                <div class="detail-item" v-if="lineAuth.currentUser.value?.statusMessage">
+                <div class="detail-item" v-if="lineStatus.currentUser?.statusMessage">
                   <span class="detail-label">狀態訊息</span>
-                  <span class="detail-value">{{ lineAuth.currentUser.value.statusMessage }}</span>
+                  <span class="detail-value">{{ lineStatus.currentUser.statusMessage }}</span>
                 </div>
-                <div class="detail-item" v-if="lineAuth.currentUser.value">
+                <div class="detail-item" v-if="lineStatus.currentUser">
                   <span class="detail-label">用戶ID</span>
                   <span class="detail-value"
-                    >{{ lineAuth.currentUser.value.userId.slice(0, 12) }}...</span
+                    >{{ lineStatus.currentUser.userId.slice(0, 12) }}...</span
                   >
                 </div>
                 <div class="detail-item">
                   <span class="detail-label">載入狀態</span>
-                  <span class="detail-value" :class="{ loading: lineAuth.isLoading.value }">
-                    {{ lineAuth.isLoading.value ? '載入中...' : '就緒' }}
+                  <span class="detail-value" :class="{ loading: lineStatus.isLoading }">
+                    {{ lineStatus.isLoading ? '載入中...' : '就緒' }}
                   </span>
                 </div>
-                <div class="detail-item" v-if="lineAuth.error.value">
+                <div class="detail-item" v-if="lineStatus.error">
                   <span class="detail-label">錯誤</span>
-                  <span class="detail-value error">{{ lineAuth.error.value }}</span>
+                  <span class="detail-value error">{{ lineStatus.error }}</span>
                 </div>
               </div>
             </div>
@@ -547,9 +582,9 @@ watch(isLoggedIn, (newValue) => {
           <div class="stat-text">
             <div class="stat-number">
               {{
-                (googleAuth.isLoggedIn.value ? 1 : 0) +
-                (appleAuth.isLoggedIn.value ? 1 : 0) +
-                (lineAuth.isLoggedIn.value ? 1 : 0)
+                (googleStatus.isLoggedIn ? 1 : 0) +
+                (appleStatus.isLoggedIn ? 1 : 0) +
+                (lineStatus.isLoggedIn ? 1 : 0)
               }}
             </div>
             <div class="stat-label">活躍連接</div>
