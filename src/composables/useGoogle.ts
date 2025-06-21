@@ -21,6 +21,30 @@ export interface GoogleAuthState {
   error: string | null
 }
 
+// Google OAuth 相關的類型定義
+export interface GoogleTokenResponse {
+  access_token: string
+  token_type: string
+  expires_in: number
+  scope: string
+}
+
+export interface GoogleOAuthError {
+  type: string
+  details?: string
+}
+
+export interface GoogleTokenClient {
+  requestAccessToken: (options?: { prompt?: string }) => void
+}
+
+export interface GoogleOAuthConfigInternal {
+  client_id: string
+  scope: string
+  callback: (response: GoogleTokenResponse) => void
+  error_callback: (error: GoogleOAuthError) => void
+}
+
 // 全域狀態
 let googleApiReady = false
 let initPromise: Promise<void> | null = null
@@ -102,41 +126,43 @@ export function useGoogle(config: GoogleOAuthConfig) {
   const defaultScopes = ['profile', 'email']
   const scopes = config.scope || defaultScopes
 
-  let tokenClient: any = null
+  let tokenClient: GoogleTokenClient | null = null
   // 處理登入成功
-  const handleAuthSuccess = async (response: any): Promise<void> => {
-    try {
-      console.log('🎉 認證成功，獲取用戶資訊...', response)
+  const handleAuthSuccess = (response: GoogleTokenResponse): void => {
+    ;(async () => {
+      try {
+        console.log('🎉 認證成功，獲取用戶資訊...', response)
 
-      // 使用 access token 獲取用戶資訊
-      const userInfoResponse = await fetch(
-        `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${response.access_token}`,
-      )
+        // 使用 access token 獲取用戶資訊
+        const userInfoResponse = await fetch(
+          `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${response.access_token}`,
+        )
 
-      if (!userInfoResponse.ok) {
-        throw new Error('無法獲取用戶資訊')
+        if (!userInfoResponse.ok) {
+          throw new Error('無法獲取用戶資訊')
+        }
+
+        const userInfo = await userInfoResponse.json()
+
+        state.user = {
+          id: userInfo.id,
+          email: userInfo.email,
+          name: userInfo.name,
+          picture: userInfo.picture,
+        }
+        state.isAuthenticated = true
+        state.error = null
+
+        // 儲存 access token
+        localStorage.setItem('google_access_token', response.access_token)
+        console.log('✅ 用戶資訊設置完成')
+      } catch (error) {
+        state.error = '獲取用戶資訊失敗'
+        console.error('❌ 處理認證成功時發生錯誤:', error)
+      } finally {
+        state.isLoading = false
       }
-
-      const userInfo = await userInfoResponse.json()
-
-      state.user = {
-        id: userInfo.id,
-        email: userInfo.email,
-        name: userInfo.name,
-        picture: userInfo.picture,
-      }
-      state.isAuthenticated = true
-      state.error = null
-
-      // 儲存 access token
-      localStorage.setItem('google_access_token', response.access_token)
-      console.log('✅ 用戶資訊設置完成')
-    } catch (error) {
-      state.error = '獲取用戶資訊失敗'
-      console.error('❌ 處理認證成功時發生錯誤:', error)
-    } finally {
-      state.isLoading = false
-    }
+    })()
   }
 
   // 初始化 Google Identity Services
@@ -166,9 +192,9 @@ export function useGoogle(config: GoogleOAuthConfig) {
         client_id: config.clientId,
         scope: scopes.join(' '),
         callback: handleAuthSuccess,
-        error_callback: (error: any) => {
+        error_callback: (error: GoogleOAuthError) => {
           console.error('❌ OAuth 錯誤:', error)
-          state.error = `認證失敗: ${error.type || '未知錯誤'}`
+          state.error = `認證失敗: ${error.type ?? '未知錯誤'}`
           state.isLoading = false
         },
       })
@@ -315,7 +341,7 @@ declare global {
     google: {
       accounts: {
         oauth2: {
-          initTokenClient: (config: any) => any
+          initTokenClient: (config: GoogleOAuthConfigInternal) => GoogleTokenClient
           revoke: (token: string, callback: () => void) => void
         }
       }
