@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh-tw">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Google Identity Services 測試</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background-color: #f9f9f9;
+      }
+      button {
+        background-color: #4285f4;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 10px 5px;
+      }
+      button:hover {
+        background-color: #357ae8;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .log {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 5px;
+        padding: 15px;
+        margin: 20px 0;
+        font-family: monospace;
+        font-size: 12px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .user-info {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      .error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 10px 0;
+        color: #721c24;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Google Identity Services 測試</h1>
+
+    <div class="test-section">
+      <h3>環境檢查</h3>
+      <p><strong>Client ID:</strong> <span id="clientId">載入中...</span></p>
+      <p><strong>當前網域:</strong> <span id="domain"></span></p>
+      <p><strong>Google API 狀態:</strong> <span id="apiStatus">檢查中...</span></p>
+      <button onclick="checkEnvironment()">重新檢查</button>
+    </div>
+
+    <div class="test-section">
+      <h3>登入測試</h3>
+      <button id="signInBtn" onclick="testSignIn()">測試登入</button>
+      <button id="signOutBtn" onclick="testSignOut()" disabled>登出</button>
+      <div id="userInfo"></div>
+      <div id="errorInfo"></div>
+    </div>
+
+    <div id="log" class="log"></div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      let tokenClient = null
+      let currentUser = null
+
+      // 從環境變數獲取 Client ID (這裡需要手動設置)
+      const CLIENT_ID = '1075042227642-r406tu3a1noo14n69in7383657i9od6u.apps.googleusercontent.com'
+
+      function addLog(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString()
+        const logEntry = document.createElement('div')
+        logEntry.innerHTML = `[${timestamp}] ${message}`
+        if (type === 'error') logEntry.style.color = 'red'
+        if (type === 'success') logEntry.style.color = 'green'
+        if (type === 'warning') logEntry.style.color = 'orange'
+        document.getElementById('log').appendChild(logEntry)
+        document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight
+      }
+
+      function checkEnvironment() {
+        addLog('🔍 檢查環境...')
+
+        document.getElementById('clientId').textContent = CLIENT_ID.substring(0, 30) + '...'
+        document.getElementById('domain').textContent = window.location.origin
+
+        if (typeof window.google !== 'undefined' && window.google.accounts) {
+          document.getElementById('apiStatus').textContent = '✅ 已載入'
+          document.getElementById('apiStatus').style.color = 'green'
+          addLog('✅ Google Identity Services 已載入', 'success')
+          initTokenClient()
+        } else {
+          document.getElementById('apiStatus').textContent = '❌ 未載入'
+          document.getElementById('apiStatus').style.color = 'red'
+          addLog('❌ Google Identity Services 未載入', 'error')
+          // 等待載入
+          setTimeout(checkEnvironment, 1000)
+        }
+      }
+
+      function initTokenClient() {
+        try {
+          addLog('🔧 初始化 Token Client...')
+
+          tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: 'profile email',
+            callback: handleAuthResponse,
+            error_callback: handleAuthError,
+          })
+
+          addLog('✅ Token Client 初始化成功', 'success')
+          document.getElementById('signInBtn').disabled = false
+        } catch (error) {
+          addLog(`❌ Token Client 初始化失敗: ${error.message}`, 'error')
+        }
+      }
+
+      function handleAuthResponse(response) {
+        addLog('🎉 認證成功，獲取用戶資訊...', 'success')
+        console.log('Auth response:', response)
+
+        if (response.access_token) {
+          fetchUserInfo(response.access_token)
+        } else {
+          addLog('❌ 未收到 access token', 'error')
+        }
+      }
+
+      function handleAuthError(error) {
+        addLog(`❌ 認證錯誤: ${JSON.stringify(error)}`, 'error')
+        document.getElementById('errorInfo').innerHTML = `
+                <div class="error">
+                    <strong>認證失敗:</strong> ${error.type || '未知錯誤'}
+                </div>
+            `
+      }
+
+      async function fetchUserInfo(accessToken) {
+        try {
+          addLog('📡 正在獲取用戶資訊...')
+
+          const response = await fetch(
+            `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${accessToken}`,
+          )
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          }
+
+          const userInfo = await response.json()
+          currentUser = userInfo
+
+          addLog('✅ 用戶資訊獲取成功', 'success')
+          console.log('User info:', userInfo)
+
+          displayUserInfo(userInfo)
+
+          document.getElementById('signInBtn').disabled = true
+          document.getElementById('signOutBtn').disabled = false
+          document.getElementById('errorInfo').innerHTML = ''
+        } catch (error) {
+          addLog(`❌ 獲取用戶資訊失敗: ${error.message}`, 'error')
+          document.getElementById('errorInfo').innerHTML = `
+                    <div class="error">
+                        <strong>獲取用戶資訊失敗:</strong> ${error.message}
+                    </div>
+                `
+        }
+      }
+
+      function displayUserInfo(userInfo) {
+        document.getElementById('userInfo').innerHTML = `
+                <div class="user-info">
+                    <h4>登入成功!</h4>
+                    <img src="${userInfo.picture}" alt="頭像" style="width: 50px; height: 50px; border-radius: 50%; margin-right: 10px;">
+                    <strong>姓名:</strong> ${userInfo.name}<br>
+                    <strong>電子郵件:</strong> ${userInfo.email}<br>
+                    <strong>ID:</strong> ${userInfo.id}
+                </div>
+            `
+      }
+
+      function testSignIn() {
+        if (!tokenClient) {
+          addLog('❌ Token Client 未初始化', 'error')
+          return
+        }
+
+        addLog('🔐 開始登入流程...')
+        document.getElementById('errorInfo').innerHTML = ''
+
+        tokenClient.requestAccessToken({
+          prompt: 'select_account',
+        })
+      }
+
+      function testSignOut() {
+        addLog('🚪 登出...')
+
+        currentUser = null
+        document.getElementById('userInfo').innerHTML = ''
+        document.getElementById('signInBtn').disabled = false
+        document.getElementById('signOutBtn').disabled = true
+
+        addLog('✅ 登出成功', 'success')
+      }
+
+      // 頁面載入完成後檢查環境
+      window.addEventListener('load', () => {
+        addLog('🚀 頁面載入完成，開始檢查環境...')
+        setTimeout(checkEnvironment, 500)
+      })
+    </script>
+  </body>
+</html>

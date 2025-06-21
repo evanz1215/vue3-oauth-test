@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-tw">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Google OAuth 除錯工具</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      .check-item {
+        margin: 10px 0;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      .check-pass {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+      }
+      .check-fail {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+      }
+      .check-warning {
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+        color: #856404;
+      }
+      button {
+        background-color: #4285f4;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 10px 5px;
+      }
+      button:hover {
+        background-color: #357ae8;
+      }
+      .log {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 5px;
+        padding: 15px;
+        margin: 20px 0;
+        font-family: monospace;
+        font-size: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Google OAuth 除錯工具</h1>
+    <p>這個工具可以幫助你診斷 Google OAuth 設置的問題。</p>
+
+    <div id="checks"></div>
+
+    <button onclick="runTests()">執行檢查</button>
+    <button onclick="testGoogleAPI()">測試 Google API</button>
+    <button onclick="clearLog()">清除記錄</button>
+
+    <div id="log" class="log"></div>
+
+    <script>
+      const log = document.getElementById('log');
+      const checksDiv = document.getElementById('checks');
+
+      function addLog(message, type = 'info') {
+          const timestamp = new Date().toLocaleTimeString();
+          const logEntry = document.createElement('div');
+          logEntry.innerHTML = `[${timestamp}] ${message}`;
+          if (type === 'error') logEntry.style.color = 'red';
+          if (type === 'success') logEntry.style.color = 'green';
+          if (type === 'warning') logEntry.style.color = 'orange';
+          log.appendChild(logEntry);
+          log.scrollTop = log.scrollHeight;
+      }
+
+      function addCheck(title, status, message) {
+          const checkDiv = document.createElement('div');
+          checkDiv.className = `check-item check-${status}`;
+          checkDiv.innerHTML = `<strong>${title}</strong><br>${message}`;
+          checksDiv.appendChild(checkDiv);
+      }
+
+      function clearLog() {
+          log.innerHTML = '';
+          checksDiv.innerHTML = '';
+      }
+
+      function runTests() {
+          clearLog();
+          addLog('開始執行檢查...');
+
+          // 檢查環境變數
+          const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+          if (!clientId || clientId === 'your-google-client-id.apps.googleusercontent.com') {
+              addCheck('Client ID', 'fail', '❌ 請在 .env 檔案中設置有效的 VITE_GOOGLE_CLIENT_ID');
+              addLog('Client ID 未設置或使用預設值', 'error');
+          } else {
+              addCheck('Client ID', 'pass', `✅ Client ID 已設置: ${clientId.substring(0, 20)}...`);
+              addLog(`Client ID: ${clientId}`, 'success');
+          }
+
+          // 檢查當前網域
+          const currentDomain = window.location.origin;
+          addCheck('當前網域', 'warning', `⚠️ 確保此網域 (${currentDomain}) 已在 Google Cloud Console 中授權`);
+          addLog(`當前網域: ${currentDomain}`, 'info');
+
+          // 檢查 HTTPS (生產環境)
+          if (location.protocol === 'https:' || location.hostname === 'localhost') {
+              addCheck('協議', 'pass', '✅ 協議檢查通過 (HTTPS 或 localhost)');
+              addLog('協議檢查通過', 'success');
+          } else {
+              addCheck('協議', 'warning', '⚠️ 生產環境建議使用 HTTPS');
+              addLog('建議使用 HTTPS', 'warning');
+          }
+
+          // 檢查瀏覽器支援
+          if (typeof fetch !== 'undefined' && typeof Promise !== 'undefined') {
+              addCheck('瀏覽器支援', 'pass', '✅ 瀏覽器支援現代 JavaScript API');
+              addLog('瀏覽器支援檢查通過', 'success');
+          } else {
+              addCheck('瀏覽器支援', 'fail', '❌ 瀏覽器不支援必要的 API');
+              addLog('瀏覽器不支援', 'error');
+          }
+
+          addLog('檢查完成');
+      }
+
+      async function testGoogleAPI() {
+          addLog('開始測試 Google API...');
+
+          try {
+              // 嘗試載入 Google API
+              const script = document.createElement('script');
+              script.src = 'https://apis.google.com/js/api.js';
+
+              script.onload = () => {
+                  addLog('Google API 腳本載入成功', 'success');
+
+                  window.gapi.load('auth2', () => {
+                      addLog('Google Auth2 API 載入成功', 'success');
+
+                      // 嘗試初始化 (使用測試 Client ID)
+                      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+                      if (clientId && clientId !== 'your-google-client-id.apps.googleusercontent.com') {
+                          window.gapi.auth2.init({
+                              client_id: clientId,
+                              scope: 'profile email'
+                          }).then(() => {
+                              addLog('Google Auth2 初始化成功!', 'success');
+                              addCheck('API 測試', 'pass', '✅ Google API 初始化成功');
+                          }).catch(error => {
+                              addLog(`Google Auth2 初始化失敗: ${error.message}`, 'error');
+                              addCheck('API 測試', 'fail', `❌ Google Auth2 初始化失敗: ${error.message}`);
+                          });
+                      } else {
+                          addLog('無法測試初始化：Client ID 未設置', 'warning');
+                          addCheck('API 測試', 'warning', '⚠️ 無法測試：請先設置 Client ID');
+                      }
+                  });
+              };
+
+              script.onerror = () => {
+                  addLog('Google API 腳本載入失敗', 'error');
+                  addCheck('API 測試', 'fail', '❌ 無法載入 Google API 腳本');
+              };
+
+              document.head.appendChild(script);
+
+          } catch (error) {
+              addLog(`API 測試錯誤: ${error.message}`, 'error');
+              addCheck('API 測試', 'fail', `❌ 測試失敗: ${error.message}`);
+          }
+      }
+
+      // 頁面載入時自動執行檢查
+      window.addEventListener('load', runTests);
+    </script>
+  </body>
+</html>
