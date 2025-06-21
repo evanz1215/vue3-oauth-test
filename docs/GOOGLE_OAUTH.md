@@ -5,12 +5,13 @@
 ## 功能特色
 
 - ✅ 完整的 Google OAuth 2.0 整合
-- ✅ 支援彈窗和重定向兩種登入模式
+- ✅ 基於 Google Identity Services
 - ✅ TypeScript 支援
 - ✅ Vue 3 Composition API
 - ✅ 響應式狀態管理
 - ✅ 錯誤處理
 - ✅ 自動 token 管理
+- ✅ 自動重新載入時恢復登入狀態
 
 ## 設置步驟
 
@@ -37,9 +38,8 @@
 ```typescript
 const googleConfig = {
   clientId: 'your-actual-client-id.apps.googleusercontent.com', // 替換為你的 Client ID
-  redirectUri: window.location.origin,
+  redirectUri: window.location.origin, // 目前未使用，但保留以備將來擴展
   scope: ['profile', 'email'],
-  usePopup: true, // 或 false 使用重定向模式
 }
 ```
 
@@ -63,8 +63,7 @@ import { useGoogle } from '@/composables/useGoogle'
 
 const googleConfig = {
   clientId: 'your-client-id.apps.googleusercontent.com',
-  redirectUri: window.location.origin,
-  usePopup: true,
+  redirectUri: window.location.origin, // 保留以備將來使用
 }
 
 const { isLoggedIn, currentUser, isLoading, error, signIn, signOut, getAccessToken } =
@@ -73,9 +72,12 @@ const { isLoggedIn, currentUser, isLoading, error, signIn, signOut, getAccessTok
 
 <template>
   <div>
-    <button v-if="!isLoggedIn" @click="signIn">登入</button>
+    <div v-if="isLoading">載入中...</div>
+    <div v-else-if="error" class="error">錯誤: {{ error }}</div>
+    <button v-else-if="!isLoggedIn" @click="signIn">登入 Google</button>
     <div v-else>
       <p>歡迎, {{ currentUser?.name }}!</p>
+      <img :src="currentUser?.picture" :alt="currentUser?.name" />
       <button @click="signOut">登出</button>
     </div>
   </div>
@@ -87,9 +89,8 @@ const { isLoggedIn, currentUser, isLoading, error, signIn, signOut, getAccessTok
 ```typescript
 interface GoogleOAuthConfig {
   clientId: string // Google Client ID (必需)
-  redirectUri: string // 重定向 URI (必需)
+  redirectUri: string // 重定向 URI (保留以備將來使用)
   scope?: string[] // OAuth scopes (可選，預設: ['profile', 'email'])
-  usePopup?: boolean // 是否使用彈窗模式 (可選，預設: false)
 }
 ```
 
@@ -98,12 +99,14 @@ interface GoogleOAuthConfig {
 ```typescript
 const {
   // 狀態
+  state, // 完整的狀態物件
   isLoggedIn, // 是否已登入
   currentUser, // 當前用戶資訊
   isLoading, // 載入狀態
   error, // 錯誤訊息
 
   // 方法
+  initGoogleAuth, // 初始化 Google 認證
   signIn, // 登入
   signOut, // 登出
   getAccessToken, // 獲取 access token
@@ -122,66 +125,70 @@ interface GoogleUser {
 }
 ```
 
-## 登入模式
+## 登入實現
 
-### 彈窗模式 (推薦)
+這個實現使用 Google Identity Services 的 Token Client 方式進行認證。
 
-```typescript
-const config = {
-  clientId: 'your-client-id',
-  redirectUri: 'http://localhost:5173',
-  usePopup: true,
-}
-```
-
-**優點：**
-
-- 用戶不會離開當前頁面
-- 更好的用戶體驗
-- 即時反馈
-
-**缺點：**
-
-- 可能被彈窗封鎖器阻擋
-- 在某些行動裝置上可能有問題
-
-### 重定向模式
+### 工作原理
 
 ```typescript
 const config = {
   clientId: 'your-client-id',
-  redirectUri: 'http://localhost:5173',
-  usePopup: false,
+  redirectUri: 'http://localhost:5173', // 保留以備將來使用
+  scope: ['profile', 'email'],
 }
 ```
 
-**優點：**
+**特點：**
 
-- 更可靠，不會被彈窗封鎖器影響
-- 在所有裝置上都能正常工作
+- 使用彈窗方式進行認證
+- 基於 Google Identity Services (GSI)
+- 自動處理 token 管理
+- 支援自動重新認證
 
-**缺點：**
+**認證流程：**
 
-- 頁面會重新載入
-- 需要處理重定向回來的狀態
+1. 載入 Google Identity Services 腳本
+2. 初始化 Token Client
+3. 用戶點擊登入後彈出 Google 認證窗口
+4. 獲取 access token
+5. 使用 token 獲取用戶資訊
+6. 自動儲存 token 到 localStorage
 
 ## 錯誤處理
 
 組件會自動處理常見錯誤：
 
+- Google API 載入失敗
 - 網路錯誤
 - 用戶取消登入
-- API 載入失敗
-- 認證失敗
+- Token 無效或過期
+- 認證配置錯誤
 
 錯誤會存儲在 `error` 響應式變數中，你可以在 UI 中顯示。
+
+### 錯誤類型
+
+```typescript
+interface GoogleOAuthError {
+  type: string
+  details?: string
+}
+```
+
+常見錯誤類型：
+
+- `popup_closed_by_user`：用戶關閉了彈窗
+- `access_denied`：用戶拒絕授權
+- `invalid_client`：無效的 Client ID
 
 ## 安全性考量
 
 1. **Client ID 保護：** Client ID 不是機密資訊，可以在前端程式碼中使用
 2. **Token 存儲：** Access token 會自動存儲在 localStorage 中
-3. **HTTPS：** 生產環境請務必使用 HTTPS
-4. **Scope 限制：** 只請求應用程式需要的權限
+3. **自動恢復：** 頁面重新載入時會自動檢查並恢復登入狀態
+4. **HTTPS：** 生產環境請務必使用 HTTPS
+5. **Scope 限制：** 只請求應用程式需要的權限
 
 ## 故障排除
 
@@ -194,8 +201,8 @@ const config = {
 
 2. **彈窗被封鎖**
 
-   - 改用重定向模式
-   - 或者引導用戶允許彈窗
+   - 引導用戶允許彈窗
+   - 檢查瀏覽器設定
 
 3. **"Unauthorized client" 錯誤**
 
@@ -216,12 +223,35 @@ const config = {
 ## 生產環境部署
 
 1. 在 Google Cloud Console 中添加生產環境網域
-2. 更新 `redirectUri` 為生產環境 URL
-3. 確保使用 HTTPS
-4. 考慮實作適當的錯誤監控
+2. 確保使用 HTTPS
+3. 考慮實作適當的錯誤監控
+4. 定期檢查 Token 的有效性
+
+## API 參考
+
+### useGoogle 組合式函數
+
+```typescript
+function useGoogle(config: GoogleOAuthConfig): {
+  // 狀態
+  state: GoogleAuthState
+  isLoggedIn: ComputedRef<boolean>
+  currentUser: ComputedRef<GoogleUser | null>
+  isLoading: ComputedRef<boolean>
+  error: ComputedRef<string | null>
+
+  // 方法
+  initGoogleAuth: () => Promise<void>
+  signIn: () => Promise<void>
+  signOut: () => Promise<void>
+  getAccessToken: () => string | null
+  checkAuthStatus: () => Promise<void>
+}
+```
 
 ## 相關連結
 
+- [Google Identity Services](https://developers.google.com/identity/gsi/web)
 - [Google OAuth 2.0 文件](https://developers.google.com/identity/protocols/oauth2)
-- [Google API JavaScript 客戶端](https://developers.google.com/api-client-library/javascript)
 - [Vue 3 文件](https://vuejs.org/)
+- [TypeScript 文件](https://www.typescriptlang.org/)
