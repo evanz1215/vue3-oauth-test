@@ -1,16 +1,18 @@
 # Vue 3 OAuth 整合測試
 
-這個專案展示了如何在 Vue 3 應用程式中整合 Google OAuth 和 Apple OAuth 登入功能。
+這個專案展示了如何在 Vue 3 應用程式中整合 Google OAuth、Apple OAuth 和 LINE OAuth 登入功能。
 
 ## 功能特色
 
 - ✅ Google OAuth 2.0 整合
 - ✅ Apple OAuth 2.0 整合
+- ✅ LINE OAuth 2.0 整合
 - ✅ TypeScript 支援
 - ✅ Vue 3 Composition API
 - ✅ 響應式狀態管理
 - ✅ 錯誤處理
 - ✅ 自動 token 管理
+- ✅ 現代化響應式設計
 
 ## 快速開始
 
@@ -43,6 +45,9 @@ VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 
 # Apple OAuth 配置
 VITE_APPLE_CLIENT_ID=com.yourcompany.yourapp.web
+
+# LINE OAuth 配置
+VITE_LINE_CLIENT_ID=your-line-client-id
 ```
 
 ### 4. 運行開發服務器
@@ -56,6 +61,14 @@ pnpm dev
 ### Google OAuth
 
 請參考 [GOOGLE_OAUTH_GUIDE.md](./GOOGLE_OAUTH_GUIDE.md) 了解詳細的 Google OAuth 設置步驟。
+
+### Apple OAuth
+
+請參考 [APPLE_OAUTH_GUIDE.md](./APPLE_OAUTH_GUIDE.md) 了解詳細的 Apple OAuth 設置步驟。
+
+### LINE OAuth
+
+請參考 [LINE_OAUTH_GUIDE.md](./LINE_OAUTH_GUIDE.md) 了解詳細的 LINE OAuth 設置步驟。
 
 ### Apple OAuth
 
@@ -92,6 +105,53 @@ const appleConfig = {
 const { isLoggedIn, currentUser, signIn, signOut } = useApple(appleConfig)
 </script>
 ```
+
+### LINE OAuth
+
+```vue
+<script setup lang="ts">
+import { useLine } from '@/composables/useLine'
+
+const lineConfig = {
+  clientId: 'your-line-client-id',
+  redirectUri: window.location.origin,
+  scope: 'profile openid',
+}
+
+const { isLoggedIn, currentUser, signIn, signOut } = useLine(lineConfig)
+</script>
+```
+
+## 架構說明
+
+### 組合式函數設計
+
+每個 OAuth 提供商都有對應的組合式函數：
+
+- `useGoogle(config)` - Google OAuth 整合
+- `useApple(config)` - Apple OAuth 整合
+- `useLine(config)` - LINE OAuth 整合
+
+所有組合式函數都提供一致的 API：
+
+```typescript
+interface OAuthComposable {
+  isLoading: ComputedRef<boolean>
+  isLoggedIn: ComputedRef<boolean>
+  currentUser: ComputedRef<User | null>
+  error: ComputedRef<string | null>
+  signIn: () => Promise<void>
+  signOut: () => Promise<void>
+}
+```
+
+### 特色功能
+
+1. **自動會話恢復**：頁面刷新後自動恢復登入狀態
+2. **錯誤處理**：統一的錯誤處理機制
+3. **響應式狀態**：基於 Vue 3 響應式系統
+4. **TypeScript 支援**：完整的類型定義
+5. **安全性**：遵循 OAuth 2.0 安全最佳實踐
 
 ## Recommended IDE Setup
 
