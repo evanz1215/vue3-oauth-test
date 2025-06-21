@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
+import { RouterView } from 'vue-router'
 import GoogleAuth from './components/GoogleAuth.vue'
+import AppleAuth from './components/AppleAuth.vue'
 </script>
 
 <template>
   <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
-
     <div class="wrapper">
-      <h1>Vue 3 Google OAuth 測試</h1>
+      <h1>Vue 3 OAuth 整合測試</h1>
 
-      <!-- Google OAuth 組件 -->
-      <GoogleAuth />
+      <div class="auth-container">
+        <!-- Google OAuth 組件 -->
+        <div class="auth-section">
+          <h2>Google 登入</h2>
+          <GoogleAuth />
+        </div>
 
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
+        <!-- Apple OAuth 組件 -->
+        <div class="auth-section">
+          <h2>Apple 登入</h2>
+          <AppleAuth />
+        </div>
+      </div>
     </div>
   </header>
 
@@ -32,6 +37,34 @@ header {
 .logo {
   display: block;
   margin: 0 auto 2rem;
+}
+
+.auth-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin: 2rem 0;
+}
+
+@media (max-width: 768px) {
+  .auth-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+.auth-section {
+  padding: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background-color: var(--color-background-soft);
+}
+
+.auth-section h2 {
+  margin: 0 0 1rem 0;
+  text-align: center;
+  color: var(--color-heading);
+  font-size: 1.25rem;
 }
 
 nav {
