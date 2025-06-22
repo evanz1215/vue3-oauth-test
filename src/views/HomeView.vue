@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import GoogleAuth from '@/components/GoogleAuth.vue'
 import AppleAuth from '@/components/AppleAuth.vue'
 import LineAuth from '@/components/LineAuth.vue'
+import FacebookAuth from '@/components/FacebookAuth.vue'
 
 const isLoaded = ref(false)
 const activeTab = ref('demo')
@@ -61,6 +62,29 @@ const lineStatus = ref<{
   error: null,
 })
 
+const facebookStatus = ref<{
+  isLoggedIn: boolean
+  currentUser: {
+    id: string
+    name: string
+    email?: string
+    picture?: {
+      data: {
+        url: string
+      }
+    }
+    first_name?: string
+    last_name?: string
+  } | null
+  isLoading: boolean
+  error: string | null
+}>({
+  isLoggedIn: false,
+  currentUser: null,
+  isLoading: false,
+  error: null,
+})
+
 // 處理各組件狀態變化
 const handleGoogleStatusChange = (status: typeof googleStatus.value) => {
   googleStatus.value = status
@@ -74,17 +98,22 @@ const handleLineStatusChange = (status: typeof lineStatus.value) => {
   lineStatus.value = status
 }
 
+const handleFacebookStatusChange = (status: typeof facebookStatus.value) => {
+  facebookStatus.value = status
+}
+
 // 計算總體登入狀態
 const totalConnected = computed(() => {
   let count = 0
   if (googleStatus.value.isLoggedIn) count++
   if (appleStatus.value.isLoggedIn) count++
   if (lineStatus.value.isLoggedIn) count++
+  if (facebookStatus.value.isLoggedIn) count++
   return count
 })
 
 const connectionRate = computed(() => {
-  return Math.round((totalConnected.value / 3) * 100)
+  return Math.round((totalConnected.value / 4) * 100)
 })
 
 // 功能特性數據
@@ -285,6 +314,31 @@ onMounted(() => {
               <LineAuth @status-change="handleLineStatusChange" />
             </div>
           </div>
+
+          <!-- Facebook OAuth -->
+          <div class="oauth-card facebook-card">
+            <div class="card-header">
+              <div class="provider-info">
+                <div class="provider-icon facebook-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                      d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
+                    />
+                  </svg>
+                </div>
+                <div class="provider-details">
+                  <h3>Facebook OAuth</h3>
+                  <p>Facebook Login Services</p>
+                </div>
+              </div>
+              <div class="status-indicator" :class="{ active: facebookStatus.isLoggedIn }">
+                <div class="status-dot"></div>
+              </div>
+            </div>
+            <div class="card-content">
+              <FacebookAuth @status-change="handleFacebookStatusChange" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -436,6 +490,49 @@ onMounted(() => {
                 <div class="detail-item" v-if="lineStatus.error">
                   <span class="detail-label">錯誤</span>
                   <span class="detail-value error">{{ lineStatus.error }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Facebook 狀態 -->
+            <div class="status-card" :class="{ authenticated: facebookStatus.isLoggedIn }">
+              <div class="status-card-header">
+                <div class="status-icon facebook">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                      d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
+                    />
+                  </svg>
+                </div>
+                <h3>Facebook</h3>
+                <div class="status-badge" :class="{ online: facebookStatus.isLoggedIn }">
+                  {{ facebookStatus.isLoggedIn ? '已連接' : '未連接' }}
+                </div>
+              </div>
+              <div class="status-details">
+                <div class="detail-item" v-if="facebookStatus.currentUser">
+                  <span class="detail-label">用戶名稱</span>
+                  <span class="detail-value">{{ facebookStatus.currentUser.name }}</span>
+                </div>
+                <div class="detail-item" v-if="facebookStatus.currentUser?.email">
+                  <span class="detail-label">電子郵件</span>
+                  <span class="detail-value">{{ facebookStatus.currentUser.email }}</span>
+                </div>
+                <div class="detail-item" v-if="facebookStatus.currentUser">
+                  <span class="detail-label">用戶ID</span>
+                  <span class="detail-value"
+                    >{{ facebookStatus.currentUser.id.slice(0, 12) }}...</span
+                  >
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">載入狀態</span>
+                  <span class="detail-value" :class="{ loading: facebookStatus.isLoading }">
+                    {{ facebookStatus.isLoading ? '載入中...' : '就緒' }}
+                  </span>
+                </div>
+                <div class="detail-item" v-if="facebookStatus.error">
+                  <span class="detail-label">錯誤</span>
+                  <span class="detail-value error">{{ facebookStatus.error }}</span>
                 </div>
               </div>
             </div>
@@ -890,6 +987,10 @@ watch(isLoggedIn, (newValue) => {
   background: linear-gradient(45deg, #00b900, #00d400);
 }
 
+.facebook-icon {
+  background: linear-gradient(45deg, #1877f2, #42a5f5);
+}
+
 .provider-icon svg {
   width: 24px;
   height: 24px;
@@ -1020,6 +1121,11 @@ watch(isLoggedIn, (newValue) => {
 
 .status-icon.line {
   background: linear-gradient(45deg, #00b900, #00d400);
+  color: white;
+}
+
+.status-icon.facebook {
+  background: linear-gradient(45deg, #3b5998, #8b9dc3);
   color: white;
 }
 
